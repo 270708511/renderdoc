@@ -228,6 +228,7 @@ file(WRITE
      # include and link against python
      "INCLUDEPATH+=${PYTHON_INCLUDE_DIR}\n"
      "LIBS+=${PYTHON_LINK}\n"
+     "PYTHON_LIBRARY_PATH=${PYTHON_LIBRARY}\n"
      "\n"
      "RENDERDOC_VERSION=${RENDERDOC_VERSION}\n"
      "\n")
@@ -452,6 +453,26 @@ install (CODE "MESSAGE(\"sudo gtk-update-icon-cache /usr/share/icons/hicolor/\")
 install (CODE "MESSAGE(\"NB: Your paths may vary.\")")
 
 endif() # if(ENABLE_QRENDERDOC)
+
+# On macOS, copy Python library to app bundle Frameworks directory to fix runtime dependency
+if(APPLE AND ENABLE_QRENDERDOC)
+    if(PYTHON_LIBRARY)
+        get_filename_component(PYTHON_LIBRARY_REAL ${PYTHON_LIBRARY} REALPATH)
+        if(EXISTS ${PYTHON_LIBRARY_REAL})
+            # Copy Python library to app bundle Frameworks directory
+            add_custom_command(TARGET build-qrenderdoc POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/bin/qrenderdoc.app/Contents/Frameworks
+                COMMAND ${CMAKE_COMMAND} -E copy ${PYTHON_LIBRARY_REAL} ${CMAKE_BINARY_DIR}/bin/qrenderdoc.app/Contents/Frameworks/
+                COMMAND install_name_tool -id @rpath/$(notdir ${PYTHON_LIBRARY_REAL}) ${CMAKE_BINARY_DIR}/bin/qrenderdoc.app/Contents/Frameworks/$(notdir ${PYTHON_LIBRARY_REAL})
+                COMMENT "Copying Python library to app bundle Frameworks directory"
+            )
+        else()
+            message(WARNING "Python library not found at ${PYTHON_LIBRARY_REAL}")
+        endif()
+    else()
+        message(WARNING "PYTHON_LIBRARY is not set, cannot copy Python library for app bundle")
+    endif()
+endif()
 
 # Build python modules - primarily used for constructing documentation
 if(ENABLE_PYRENDERDOC AND UNIX)
